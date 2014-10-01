@@ -8,7 +8,9 @@ import json
 import time
 from operator import itemgetter
 from datetime import datetime
+import re
 
+### Start of declaration of global variables
 api_url="https://ello.co/api/v1/availability/username?value="
 hdr = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -17,16 +19,29 @@ hdr = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML,
        'Accept-Language': 'en-US,en;q=0.8',
        'Connection': 'keep-alive'}
 secs_to_pause_between_api_calls=10
-output_sep="\t"
+### End of declaration of global variables
 
+#################for tor enthusiasts; run tor on port 1080 
+def tor_setup():
+    import socks # you'll need to install python-socksipy
+    import socket
+    def create_connection(address, timeout=None, source_address=None):
+    	sock = socks.socksocket()
+    	sock.connect(address)
+    	return sock
+    socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 1080) #change port as apropro
+    # patch the socket module
+    socket.socket = socks.socksocket
+    socket.create_connection = create_connection
+#################end of for tor enthusiasts
 
 def main():
 	parser = argparse.ArgumentParser(description='Simple python script that checks if your preferred usernames are available @ Ello.co')
 	parser.add_argument('-i', action='store', dest='input_file', help='input file with one username per line (e.g. usernames.txt)', required=True)
 	parser.add_argument('-o', action='store', dest='output_file', help='output file (e.g. available.txt)', required=True)
+	parser.add_argument('-anon', action='store_true', dest='route_via_tor', help='route via tor or not', required=False)
 	parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 	args = parser.parse_args()
-
 	# print ello logo
 	indent="           "
 	print("")
@@ -57,7 +72,23 @@ def main():
 	print("")
 	# Initialize default logging behaviour
 	logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)-6s %(message)s',datefmt="%H:%M:%S")
-
+    #Attempt to route via tor if -anon option is passed
+	try:
+		if args.route_via_tor:
+			logging.info("attempting to route via tor")
+			try:
+				tor_setup()
+				logging.info("your tor routed ip is: " + '\033[92m' + re.findall( r'[0-9]+(?:\.[0-9]+){3}',urllib2.urlopen(urllib2.Request("http://checkip.dyndns.org", headers=hdr)).read())[0]+ '\033[0m')
+			except:
+				logging.info("routing via tor was not successful")
+		else:
+			logging.info("no routing specified")
+			try:
+			    logging.info("your ip is: " + re.findall( r'[0-9]+(?:\.[0-9]+){3}',urllib2.urlopen(urllib2.Request("http://checkip.dyndns.org", headers=hdr)).read())[0])
+			except:
+				pass
+	except:
+		logging.info("something's wrong with anon argument")
     # Attempt to open input file with preferred usernames
 	logging.info("opening " + args.input_file +" for reading")
 	try:
@@ -73,7 +104,6 @@ def main():
 	except Exception as e:
 		logging.error("Failed to open output file " + args.output_file + "Error: " + str(e.args))
 		sys.exit(1)
-
 	for username in usernames:
 		username = username.rstrip()
 		if not username:
