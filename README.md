@@ -17,6 +17,10 @@ or
 
 python ./ello-username-checker.py --help
 
+requirements
+=====================
+python 2.7+
+
 license
 =====================
 standard MIT license
